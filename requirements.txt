@@ -1,0 +1,6 @@
+numpy<2
+flask
+gunicorn
+pandas
+scikit-learn
+scikit-surprise
