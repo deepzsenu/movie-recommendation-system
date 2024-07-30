@@ -1,8 +1,8 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
+from sklearn.neighbors import NearestNeighbors
 import pickle
-from surprise import SVD, Dataset, Reader
+from surprise import SVD as SurpriseSVD, Dataset, Reader
 
 # Load the ratings data
 ratings = pd.read_csv('ml-100k/u.data', sep='\t', names=['userId', 'movieId', 'rating', 'timestamp'])
@@ -28,9 +28,12 @@ movies['genres'] = movies[genre_columns].apply(lambda row: ' '.join(row.index[ro
 # Merge ratings and movies data
 data = pd.merge(ratings, movies[['movieId', 'title', 'genres']], on='movieId')
 
+# Limit to top 500 movies based on the number of ratings
+top_movies = data['movieId'].value_counts().head(500).index
+data = data[data['movieId'].isin(top_movies)]
+
 # Save the preprocessed dataset to a CSV file
 data.to_csv('data/movies.csv', index=False)
-
 
 # Load the merged data
 data = pd.read_csv('data/movies.csv')
@@ -41,13 +44,12 @@ data = Dataset.load_from_df(data[['userId', 'movieId', 'rating']], reader)
 trainset = data.build_full_trainset()
 
 # Train the SVD algorithm
-algo = SVD()
+algo = SurpriseSVD()
 algo.fit(trainset)
 
 # Save the model to a file
 with open('models/recommendation_model.pkl', 'wb') as f:
     pickle.dump(algo, f)
-
 
 # Load the movie data
 movies = pd.read_csv('data/movies.csv')
@@ -59,9 +61,22 @@ movies['genres'] = movies['genres'].str.replace('|', ' ')
 tfidf = TfidfVectorizer(stop_words='english')
 tfidf_matrix = tfidf.fit_transform(movies['genres'])
 
-# Compute the cosine similarity matrix
-cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+# Use NearestNeighbors to find the nearest neighbors for each movie
+nn = NearestNeighbors(metric='cosine', algorithm='brute')
+nn.fit(tfidf_matrix)
 
-# Save the cosine similarity matrix
-with open('models/cosine_sim.pkl', 'wb') as f:
-    pickle.dump(cosine_sim, f)
+# Save the NearestNeighbors model
+with open('models/nn_model.pkl', 'wb') as f:
+    pickle.dump(nn, f)
+
+# Function to get nearest neighbors
+def get_nearest_neighbors(movie_id, n_neighbors=10):
+    movie_idx = movies[movies['movieId'] == movie_id].index[0]
+    distances, indices = nn.kneighbors(tfidf_matrix[movie_idx], n_neighbors=n_neighbors)
+    return distances, indices
+
+# Example usage
+movie_id = 1  # Toy Story (1995)
+distances, indices = get_nearest_neighbors(movie_id)
+for i, idx in enumerate(indices[0]):
+    print(f"Movie: {movies.iloc[idx]['title']}, Distance: {distances[0][i]}")
