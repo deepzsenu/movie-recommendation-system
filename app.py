@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import NearestNeighbors
@@ -6,6 +7,7 @@ import pickle
 from surprise import SVD as SurpriseSVD, Dataset, Reader
 
 app = Flask(__name__)
+CORS(app)
 
 # Load the trained SVD model
 with open('models/recommendation_model.pkl', 'rb') as f:

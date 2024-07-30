@@ -4,3 +4,4 @@ gunicorn
 pandas
 scikit-learn
 scikit-surprise
+flask-cors
